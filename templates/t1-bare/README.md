@@ -6,26 +6,34 @@ Works **with or without** a persistent volume.
 ---
 
 ## Features
-- A1111 on **port 7860** (auto-fallback to **7861** if busy)
+- A1111 on **port 7860** (auto-fallback to **7861** if 7860 is busy)
 - Health shim on **port 3000** (returns 503 until A1111 is ready, then 200)
 - Log file: `/opt/webui/webui.log`
 - Torch 2.4.0 + xFormers 0.0.27.post2 (CUDA 12.1)
 
 ---
 
-## Ports to expose (RunPod)
-- `7860` → A1111 WebUI  
-- `3000` → Health endpoint  
+## Docker Hub Image
+docker.io/freeradical16/stable-diffusion-a1111:t1-bare
 
 ---
 
-## Environment Variables
+## RunPod Setup
 
-```env
-DATA_DIR=/workspace/a1111-data
-WEBUI_ARGS=--listen --port 7860 --api
+### Ports
+7860  
+3000  
 
-PIP_CACHE_DIR=/workspace/.cache/pip
-HF_HOME=/workspace/.cache/huggingface
-TORCH_HOME=/workspace/.cache/torch
-PYTHONWARNINGS=ignore::FutureWarning,ignore::UserWarning
+### Environment Variables
+DATA_DIR=/workspace/a1111-data  
+WEBUI_ARGS=--listen --port 7860 --api  
+
+### Volumes
+- Leave blank → ephemeral (data wiped on *Terminate*).  
+- Attach a **named volume** at `/workspace` → persistence for models, extensions, outputs.
+
+---
+
+## Notes
+- Default SD 1.5 model (`v1-5-pruned-emaonly`) will auto-download if no model is present.  
+- Place your own models in `/workspace/a1111-data/models/Stable-diffusion` for persistence.
