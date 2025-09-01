@@ -30,10 +30,13 @@ WEBUI_ARGS=--listen --api
 
 ### Volumes
 - Leave blank → ephemeral (data wiped on *Terminate*).  
-- Attach a **named volume** at `/workspace` → persistence for models, extensions, outputs.
+- Attach a **named volume** at `/workspace` → persistence.
 
 ---
 
 ## Notes
 - Default SD 1.5 model (`v1-5-pruned-emaonly`) will auto-download if no model is present.  
-- Place your own models in `/workspace/a1111-data/models/Stable-diffusion` for persistence.
+- Runtime data lives under `${DATA_DIR}` inside the container:
+  - `${DATA_DIR}/models/Stable-diffusion`
+  - `${DATA_DIR}/extensions`
+  - `${DATA_DIR}/outputs`
