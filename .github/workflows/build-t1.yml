@@ -1,8 +1,6 @@
 # -----------------------------------------------------------------------------
 # GitHub Actions workflow for Template 1 (t1-bare)
-# - Builds the image in templates/t1-bare
-# - Pushes a single rolling tag: t1-bare
-# - Repo name: stable-diffusion-a1111
+# Builds Docker image from templates/t1-bare and pushes a single rolling tag.
 # -----------------------------------------------------------------------------
 
 name: Build & Push (Template 1 - t1-bare)
@@ -13,11 +11,17 @@ on:
     paths:
       - 'templates/t1-bare/**'
       - '.github/workflows/build-t1.yml'
-  workflow_dispatch:   # allow manual trigger
+  workflow_dispatch:
+
+concurrency:
+  group: t1-bare-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -39,11 +43,8 @@ jobs:
           file: templates/t1-bare/Dockerfile
           push: true
           tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/stable-diffusion-a1111:t1-bare
-
-          # Prevent Hub 400 errors
+          platforms: linux/amd64
           provenance: false
           sbom: false
-
-          # Reuse layers for faster builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
