@@ -1,8 +1,6 @@
 # -----------------------------------------------------------------------------
 # GitHub Actions workflow for Template 2 (t2-tools)
-# - Builds the image in templates/t2-tools
-# - Pushes a single rolling tag: t2-tools
-# - Repo name: stable-diffusion-a1111
+# Builds Docker image from templates/t2-tools and pushes a single rolling tag.
 # -----------------------------------------------------------------------------
 
 name: Build & Push (Template 2 - t2-tools)
@@ -13,11 +11,17 @@ on:
     paths:
       - 'templates/t2-tools/**'
       - '.github/workflows/build-t2.yml'
-  workflow_dispatch:   # allow manual trigger
+  workflow_dispatch:
+
+concurrency:
+  group: t2-tools-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -39,11 +43,8 @@ jobs:
           file: templates/t2-tools/Dockerfile
           push: true
           tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/stable-diffusion-a1111:t2-tools
-
-          # Prevent Hub 400 errors
+          platforms: linux/amd64
           provenance: false
           sbom: false
-
-          # Reuse layers for faster CI builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
