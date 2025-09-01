@@ -1,43 +1,56 @@
 # Template 2 — A1111 + File Browser + JupyterLab
 
-Runs **Automatic1111 WebUI** (A1111) plus:
-- **File Browser** on port **8080**  
-- **JupyterLab** on port **8888**
+Runs **Automatic1111 Stable Diffusion WebUI** plus extras: File Browser + JupyterLab.  
+Designed for easier file management and interactive workflows.
 
 ---
 
 ## Features
-- A1111 on **7860** (auto-fallback to **7861** if busy)
-- Health shim on **3000** (returns 503 until A1111 is ready, then 200)
-- File Browser on **8080**
-- JupyterLab on **8888**
+- A1111 on **port 7860**
+- File Browser on **port 8080**
+- JupyterLab on **port 8888**
+- Health shim on **port 3000**
+- Log files: `/workspace/filebrowser.log`, `/workspace/jupyter.log`
 
 ---
 
-## Ports to expose (RunPod)
-- `7860` → A1111  
-- `3000` → Health endpoint  
-- `8080` → File Browser  
-- `8888` → JupyterLab  
+## Docker Hub Image
+docker.io/freeradical16/stable-diffusion-a1111:t2-tools
 
 ---
 
-## Environment Variables
+## RunPod Setup
 
-```env
-DATA_DIR=/workspace/a1111-data
-WEBUI_ARGS=--listen --port 7860 --api
+### Ports
+7860  
+3000  
+8080  
+8888  
 
-PIP_CACHE_DIR=/workspace/.cache/pip
-HF_HOME=/workspace/.cache/huggingface
-TORCH_HOME=/workspace/.cache/torch
-PYTHONWARNINGS=ignore::FutureWarning,ignore::UserWarning
+### Environment Variables
 
-ENABLE_FILEBROWSER=true
-FILEBROWSER_PORT=8080
-FILEBROWSER_NOAUTH=true
+Required:
+DATA_DIR=/workspace/a1111-data  
+WEBUI_ARGS=--listen --port 7860 --api  
 
-ENABLE_JUPYTER=true
-JUPYTER_PORT=8888
-JUPYTER_DIR=/workspace
-JUPYTER_TOKEN=
+Adds for File Browser:
+ENABLE_FILEBROWSER=true  
+FILEBROWSER_PORT=8080  
+FILEBROWSER_NOAUTH=true  
+
+Adds for Jupyter:
+ENABLE_JUPYTER=true  
+JUPYTER_PORT=8888  
+JUPYTER_DIR=/workspace  
+JUPYTER_TOKEN=  
+
+### Volumes
+- Leave blank → ephemeral (data wiped on *Terminate*).  
+- Attach a **named volume** at `/workspace` → persistence for models, extensions, notebooks, outputs.
+
+---
+
+## Notes
+- Default SD 1.5 model (`v1-5-pruned-emaonly`) will auto-download if no model is present.  
+- Place your own models in `/workspace/a1111-data/models/Stable-diffusion` for persistence.  
+- JupyterLab and File Browser are optional and controlled via env vars.
