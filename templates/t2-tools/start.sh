@@ -47,7 +47,6 @@ if [[ "${ENABLE_FILEBROWSER:-false}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
       --root / \
       $( [[ "$FB_NOAUTH" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]] && echo --noauth ) \
       >/workspace/filebrowser.log 2>&1 &
-    # wait up to 30s
     for i in {1..30}; do
       port_listening "$FB_PORT" && echo "[ok] File Browser listening on :${FB_PORT}" && break
       sleep 1
@@ -82,7 +81,6 @@ if [[ "${ENABLE_JUPYTER:-false}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
       --no-browser \
       --allow-root \
       >/workspace/jupyter.log 2>&1 &
-    # wait up to 30s
     for i in {1..30}; do
       port_listening "$J_PORT" && echo "[ok] JupyterLab listening on :${J_PORT}" && break
       sleep 1
@@ -97,7 +95,7 @@ fi
 
 # -------- Health shim on :3000 (HTTP 503 until A1111 is ready → 200)
 python3 - <<'PY' &
-import http.server, socketserver, os, time, urllib.request
+import http.server, socketserver, threading, time, urllib.request
 PORT=3000
 def ready():
     try:
@@ -110,12 +108,14 @@ class H(http.server.SimpleHTTPRequestHandler):
 with socketserver.TCPServer(("0.0.0.0", PORT), H) as httpd: httpd.serve_forever()
 PY
 
-# -------- Start A1111 (non-blocking)
+# -------- Start A1111 (via launch.py instead of webui.sh)
 echo "[start] A1111 on :7860 (data dir: ${DATA_DIR})"
-nohup /opt/webui/webui.sh --data-dir "${DATA_DIR}" \
-  --enable-insecure-extension-access ${WEBUI_ARGS} \
+nohup python3 /opt/webui/launch.py \
+  --data-dir "${DATA_DIR}" \
+  --enable-insecure-extension-access \
+  ${WEBUI_ARGS} \
   >/opt/webui/webui.log 2>&1 &
 
-# Keep container alive and show tail
+# Keep container alive and tail the log
 echo "[tail] /opt/webui/webui.log"
 tail -n +1 -f /opt/webui/webui.log
