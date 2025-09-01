@@ -44,9 +44,9 @@ RUN pip install --upgrade pip wheel setuptools && \
 # -------------------------
 RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
 
-# Startup
+# Startup script
 COPY start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh   # <--- ensures executable inside container
 
 # Ports
 EXPOSE 7860 3000 8080 8888
