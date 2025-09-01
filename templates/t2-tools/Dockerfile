@@ -8,11 +8,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     TINI_SUBREAPER=1
 
-# System deps (+ iproute2 so `ss` exists)
+# System deps (add iproute2 for `ss`, unzip for convenience)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates tini \
     python3 python3-venv python3-pip \
-    libgl1 libglib2.0-0 iproute2 \
+    libgl1 libglib2.0-0 iproute2 unzip \
  && rm -rf /var/lib/apt/lists/*
 
 # A1111
@@ -41,7 +41,7 @@ RUN chmod +x /usr/local/bin/start.sh
 EXPOSE 7860 3000 8080 8888
 
 ENV DATA_DIR="/workspace/a1111-data" \
-    WEBUI_ARGS="--listen --port 7860 --api" \
+    WEBUI_ARGS="--listen --api" \
     PYTHONWARNINGS="" \
     ENABLE_FILEBROWSER="true" \
     FILEBROWSER_PORT="8080" \
