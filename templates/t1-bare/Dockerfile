@@ -14,11 +14,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     TINI_SUBREAPER=1
 
-# System dependencies (minimal)
+# System dependencies (add iproute2 for `ss`, unzip for convenience)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates tini \
     python3 python3-venv python3-pip \
     libgl1 libglib2.0-0 \
+    iproute2 unzip \
  && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------
@@ -45,7 +46,7 @@ RUN pip install --upgrade pip wheel setuptools && \
 # Startup script
 # -----------------------------------------------------------------------------
 COPY start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh   # <--- ensures script is executable
+RUN chmod +x /usr/local/bin/start.sh
 
 # -----------------------------------------------------------------------------
 # Expose A1111 + health shim
@@ -56,10 +57,10 @@ EXPOSE 7860 3000
 # Defaults (works with or without mounted /workspace volume)
 # -----------------------------------------------------------------------------
 ENV DATA_DIR="/workspace/a1111-data" \
-    WEBUI_ARGS="--listen --port 7860 --api" \
+    WEBUI_ARGS="--listen --api" \
     PYTHONWARNINGS=""
 
-# Optional caches (commented out; define in RunPod env if desired)
+# Optional caches (define in RunPod env if desired)
 # ENV PIP_CACHE_DIR=/workspace/.cache/pip
 # ENV HF_HOME=/workspace/.cache/huggingface
 # ENV TORCH_HOME=/workspace/.cache/torch
