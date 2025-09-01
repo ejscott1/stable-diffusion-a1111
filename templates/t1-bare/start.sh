@@ -5,7 +5,7 @@ set -e
 # Template 1 launcher for Automatic1111
 # - Works with or without a mounted /workspace volume
 # - Optional cache envs supported (PIP_CACHE_DIR, HF_HOME, TORCH_HOME)
-# - Health shim on :3000 so RunPod "Ready" flips at the right time
+# - Health shim on :3000 (probes the chosen WebUI port)
 # - Port fallback: 7860 -> 7861 if busy
 # - Logs to /opt/webui/webui.log
 # -----------------------------------------------------------------------------
@@ -21,23 +21,34 @@ mkdir -p "${DATA_DIR}"/{models/Stable-diffusion,models/ControlNet,extensions,out
 
 # Optional caches (only if you defined these envs in your RunPod template)
 for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
-  val="${!v}"
+  val="${!v:-}"
   if [[ -n "$val" ]]; then
     mkdir -p "$val"
     echo "[init] ${v} -> $val"
   fi
 done
 
-# Health shim on :3000 (503 until A1111 answers on :7860, then 200)
-python3 - <<'PY' >/workspace/health.log 2>&1 &
-import http.server, socketserver, threading, time, urllib.request
+# Pick port: default 7860, fallback to 7861 if already in use
+PORT_DEFAULT=7860
+PORT=${PORT:-$PORT_DEFAULT}
+if command -v ss >/dev/null 2>&1 && ss -lnt | grep -q ":${PORT_DEFAULT} "; then
+  echo "[init] Port ${PORT_DEFAULT} busy, switching to 7861"
+  PORT=7861
+fi
+export PORT
 
+# Health shim on :3000 (503 until A1111 answers on chosen PORT, then 200)
+# Log under DATA_DIR to avoid permission issues
+python3 - <<'PY' >"${DATA_DIR}/health.log" 2>&1 &
+import http.server, socketserver, threading, time, urllib.request, os
+APP_PORT = int(os.environ.get("PORT","7860"))
 ready = False
 def poll():
     global ready
+    url = f"http://127.0.0.1:{APP_PORT}/"
     while True:
         try:
-            urllib.request.urlopen("http://127.0.0.1:7860/", timeout=1)
+            urllib.request.urlopen(url, timeout=1)
             ready = True
             time.sleep(2)
         except Exception:
@@ -56,19 +67,11 @@ with socketserver.TCPServer(("0.0.0.0", 3000), H) as httpd:
     httpd.serve_forever()
 PY
 
-# Pick port: default 7860, fallback to 7861 if already in use
-PORT_DEFAULT=7860
-PORT=${PORT:-$PORT_DEFAULT}
-if ss -lnt | grep -q ":${PORT_DEFAULT} "; then
-  echo "[init] Port ${PORT_DEFAULT} busy, switching to 7861"
-  PORT=7861
-fi
-
 # Launch A1111 (log to /opt/webui/webui.log)
 cd /opt/webui
 exec python3 launch.py \
   --data-dir "${DATA_DIR}" \
   --enable-insecure-extension-access \
   ${WEBUI_ARGS:-} \
-  --port ${PORT} \
+  --port "${PORT}" \
   2>&1 | tee -a /opt/webui/webui.log
