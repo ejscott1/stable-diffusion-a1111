@@ -5,7 +5,7 @@ echo "---------------------------------------------------------------"
 echo "# Template 3: A1111 + File Browser + Jupyter + Core Extensions"
 echo "---------------------------------------------------------------"
 
-# Safer globbing: empty matches expand to nothing (prevents literal '*/' paths)
+# Safer globbing: empty matches expand to nothing
 shopt -s nullglob
 
 port_listening() {
@@ -23,7 +23,7 @@ norm_true() {
 
 dl() {  # dl <url> <dst>
   local url="${1:-}" dst="${2:-}"
-  if [[ -z "${url}" || -z "${dst}" ]]; then
+  if [[ -z "$url" || -z "$dst" ]]; then
     echo "[dl] missing url or dst"; return 1
   fi
   [[ -f "$dst" ]] && { echo "[dl] exists: $(basename "$dst")"; return 0; }
@@ -47,7 +47,7 @@ done
 
 export PATH="/opt/venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
-# ----- File Browser
+# -------------------- File Browser --------------------
 if norm_true "${ENABLE_FILEBROWSER:-true}"; then
   FB_PORT="${FILEBROWSER_PORT:-8080}"
   echo "[start] File Browser :${FB_PORT}"
@@ -58,7 +58,7 @@ if norm_true "${ENABLE_FILEBROWSER:-true}"; then
   for i in {1..30}; do port_listening "$FB_PORT" && echo "[ok] filebrowser :$FB_PORT" && break; sleep 1; done
 fi
 
-# ----- JupyterLab (isolated venv under /workspace)
+# -------------------- JupyterLab ----------------------
 if norm_true "${ENABLE_JUPYTER:-true}"; then
   J_DIR="${JUPYTER_DIR:-/workspace}"
   J_PORT="${JUPYTER_PORT:-8888}"
@@ -90,16 +90,20 @@ if norm_true "${ENABLE_JUPYTER:-true}"; then
   for i in {1..30}; do port_listening "$J_PORT" && echo "[ok] jupyter :${J_PORT}" && break; sleep 1; done
 fi
 
-# ----- Core extensions (persist under ${DATA_DIR}/extensions, symlink to /opt/webui)
+# --------------- Core A1111 Extensions ----------------
 install_ext() {
-  local name="${1:-}" repo="${2:-}"
+  local name="${1:-}" repo="${2:-}" dest="${DATA_DIR}/extensions/${name}"
   if [[ -z "$name" || -z "$repo" ]]; then
-    echo "[ext] missing name or repo"; return 1
+    echo "[ext] missing name or repo"; return 0
   fi
-  local dest="${DATA_DIR}/extensions/${name}"
   if [[ ! -d "$dest/.git" ]]; then
     echo "[ext] installing $name -> $dest"
-    git clone --depth=1 "$repo" "$dest" || { echo "[ext] failed: $name"; return 1; }
+    # Prevent credential prompts; if GitHub hiccups, don't kill the pod
+    if GIT_ASKPASS=true git clone --depth=1 "$repo" "$dest"; then
+      echo "[ext] ok: $name"
+    else
+      echo "[ext] WARN: failed to install $name (continuing)"
+    fi
   else
     echo "[ext] exists: $name"
   fi
@@ -117,8 +121,8 @@ for d in "${DATA_DIR}"/extensions/*; do
   ln -sf "$d" "/opt/webui/extensions/$(basename "$d")"
 done
 
-# ----- Recommended assets (first-run download if missing)
-# ESRGAN upscalers (work with Ultimate SD Upscale)
+# --------------- Recommended Assets -------------------
+# ESRGAN upscalers
 dl "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth" \
    "${DATA_DIR}/models/ESRGAN/4x-UltraSharp.pth"
 dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth" \
@@ -126,7 +130,7 @@ dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x
 dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth" \
    "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus_anime_6B.pth"
 
-# ADetailer YOLO models (placed where ADetailer expects)
+# ADetailer YOLO models
 dl "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" \
    "${DATA_DIR}/models/ADetailer/face_yolov9c.pt"
 dl "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt" \
@@ -144,7 +148,7 @@ dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/contro
 dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11p_sd15_openpose.pth" \
    "${CN_DIR}/control_v11p_sd15_openpose.pth"
 
-# ----- Health shim on :3000 (503 until A1111 ready)
+# ------------------ Health shim :3000 -----------------
 python3 - <<'PY' &
 import http.server, socketserver, urllib.request, os
 APP_PORT = int(os.environ.get("PORT","7860"))
@@ -156,7 +160,7 @@ class H(http.server.SimpleHTTPRequestHandler):
 with socketserver.TCPServer(("0.0.0.0",3000), H) as httpd: httpd.serve_forever()
 PY
 
-# ----- A1111 (via launch.py) with port fallback
+# ------------------ Launch A1111 ----------------------
 PORT="${PORT:-7860}"
 if port_listening "$PORT"; then
   echo "[init] port ${PORT} busy, trying 7861"
