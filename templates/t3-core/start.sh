@@ -93,8 +93,9 @@ install_ext() {
   fi
 }
 
-install_ext "adetailer" "https://github.com/Bing-su/adetailer"        # ADetailer 3
-install_ext "sd-webui-controlnet" "https://github.com/Mikubill/sd-webui-controlnet"  # ControlNet 4
+# ADetailer, ControlNet, Ultimate Upscale, Images Browser
+install_ext "adetailer" "https://github.com/Bing-su/adetailer"
+install_ext "sd-webui-controlnet" "https://github.com/Mikubill/sd-webui-controlnet"
 install_ext "ultimate-upscale-for-automatic1111" "https://github.com/Coyote-A/ultimate-upscale-for-automatic1111"
 install_ext "images-browser" "https://github.com/AlUlkesh/sd-webui-images-browser"
 
@@ -108,23 +109,32 @@ done
 # ----- Recommended assets (first-run download if missing)
 # ESRGAN upscalers (work with Ultimate SD Upscale)
 dl "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth" \
-   "${DATA_DIR}/models/ESRGAN/4x-UltraSharp.pth"   # 5
+   "${DATA_DIR}/models/ESRGAN/4x-UltraSharp.pth"
 dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth" \
-   "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus.pth"   # 6
+   "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus.pth"
 dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth" \
-   "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus_anime_6B.pth"   # 7
+   "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus_anime_6B.pth"
 
 # ADetailer YOLO models (placed where ADetailer expects)
 dl "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" \
-   "${DATA_DIR}/models/ADetailer/face_yolov9c.pt"   # 8
+   "${DATA_DIR}/models/ADetailer/face_yolov9c.pt"
 dl "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt" \
-   "${DATA_DIR}/models/ADetailer/hand_yolov8n.pt"   # 9
+   "${DATA_DIR}/models/ADetailer/hand_yolov8n.pt"
 dl "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8n-seg.pt" \
-   "${DATA_DIR}/models/ADetailer/person_yolov8n-seg.pt"   # 10
+   "${DATA_DIR}/models/ADetailer/person_yolov8n-seg.pt"
 
-# ControlNet note (models are large; see official index)
-echo "[info] ControlNet model index: https://github.com/Mikubill/sd-webui-controlnet/wiki/Model-download" \
-  >> "${DATA_DIR}/first_run_notes.txt"   # 11
+# ControlNet — include SD 1.5 basics by default (canny, depth, openpose)
+CN_DIR="${DATA_DIR}/models/ControlNet"
+mkdir -p "${CN_DIR}"
+
+dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11p_sd15_canny.pth" \
+   "${CN_DIR}/control_v11p_sd15_canny.pth"
+dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11f1p_sd15_depth.pth" \
+   "${CN_DIR}/control_v11f1p_sd15_depth.pth"
+dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11p_sd15_openpose.pth" \
+   "${CN_DIR}/control_v11p_sd15_openpose.pth"
+
+# (Optional to expand later: add SDXL variants above with extra dl lines)
 
 # ----- Health shim on :3000 (503 until A1111 ready)
 python3 - <<'PY' &
