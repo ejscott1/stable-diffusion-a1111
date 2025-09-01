@@ -21,12 +21,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
+# -----------------------------------------------------------------------------
 # Clone Automatic1111
+# -----------------------------------------------------------------------------
 WORKDIR /opt/webui
 ARG A1111_REPO=https://github.com/AUTOMATIC1111/stable-diffusion-webui
 RUN git clone --depth=1 ${A1111_REPO} .
 
+# -----------------------------------------------------------------------------
 # Python venv + Torch + xFormers stack
+# -----------------------------------------------------------------------------
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 RUN pip install --upgrade pip wheel setuptools && \
@@ -37,14 +41,20 @@ RUN pip install --upgrade pip wheel setuptools && \
                accelerate transformers timm einops requests psutil Pillow==9.5.0 && \
     pip cache purge
 
+# -----------------------------------------------------------------------------
 # Startup script
+# -----------------------------------------------------------------------------
 COPY start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh   # <--- ensures script is executable
 
+# -----------------------------------------------------------------------------
 # Expose A1111 + health shim
+# -----------------------------------------------------------------------------
 EXPOSE 7860 3000
 
+# -----------------------------------------------------------------------------
 # Defaults (works with or without mounted /workspace volume)
+# -----------------------------------------------------------------------------
 ENV DATA_DIR="/workspace/a1111-data" \
     WEBUI_ARGS="--listen --port 7860 --api" \
     PYTHONWARNINGS=""
