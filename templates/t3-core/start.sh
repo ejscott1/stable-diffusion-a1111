@@ -18,11 +18,20 @@ norm_true() {
   [[ "$(echo "${1:-}" | sed 's/#.*$//' | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" =~ ^(true|1|yes)$ ]]
 }
 
+dl() {  # dl <url> <dst>
+  local url="$1" dst="$2"
+  [[ -f "$dst" ]] && { echo "[dl] exists: $(basename "$dst")"; return 0; }
+  echo "[dl] $url -> $dst"
+  mkdir -p "$(dirname "$dst")"
+  curl -fL --retry 5 --retry-delay 2 "$url" -o "$dst"
+}
+
 DATA_DIR="${DATA_DIR:-/workspace/a1111-data}"
 WEBUI_ARGS="${WEBUI_ARGS:---listen --api}"
 
-# Ensure dirs
-mkdir -p "${DATA_DIR}"/{models/Stable-diffusion,models/ControlNet,extensions,outputs}
+# Ensure runtime layout
+mkdir -p "${DATA_DIR}"/models/{Stable-diffusion,ControlNet,ESRGAN,ADetailer} \
+         "${DATA_DIR}"/{extensions,outputs}
 
 # Optional caches
 for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
@@ -73,7 +82,7 @@ if norm_true "${ENABLE_JUPYTER:-true}"; then
   for i in {1..30}; do port_listening "$J_PORT" && echo "[ok] jupyter :${J_PORT}" && break; sleep 1; done
 fi
 
-# ----- Core extensions (persist in ${DATA_DIR}/extensions, symlink into /opt/webui)
+# ----- Core extensions (persist under ${DATA_DIR}/extensions, symlink to /opt/webui)
 install_ext() {
   local name="$1" repo="$2" dest="${DATA_DIR}/extensions/${name}"
   if [[ ! -d "$dest/.git" ]]; then
@@ -84,19 +93,38 @@ install_ext() {
   fi
 }
 
-if norm_true "${ENABLE_EXTENSIONS_CORE:-true}"; then
-  norm_true "${ENABLE_EXT_ADETAILER:-true}"       && install_ext "adetailer" "https://github.com/Bing-su/adetailer"
-  norm_true "${ENABLE_EXT_CONTROLNET:-true}"      && install_ext "sd-webui-controlnet" "https://github.com/Mikubill/sd-webui-controlnet"
-  norm_true "${ENABLE_EXT_ULTUPSCALE:-true}"      && install_ext "ultimate-upscale-for-automatic1111" "https://github.com/Coyote-A/ultimate-upscale-for-automatic1111"
-  norm_true "${ENABLE_EXT_IMAGES_BROWSER:-true}"  && install_ext "images-browser" "https://github.com/AlUlkesh/sd-webui-images-browser"
+install_ext "adetailer" "https://github.com/Bing-su/adetailer"        # ADetailer 3
+install_ext "sd-webui-controlnet" "https://github.com/Mikubill/sd-webui-controlnet"  # ControlNet 4
+install_ext "ultimate-upscale-for-automatic1111" "https://github.com/Coyote-A/ultimate-upscale-for-automatic1111"
+install_ext "images-browser" "https://github.com/AlUlkesh/sd-webui-images-browser"
 
-  # Symlink persisted extensions into A1111
-  mkdir -p /opt/webui/extensions
-  for d in "${DATA_DIR}"/extensions/*; do
-    [[ -d "$d" ]] || continue
-    ln -sf "$d" "/opt/webui/extensions/$(basename "$d")"
-  done
-fi
+# Symlink persisted extensions into A1111
+mkdir -p /opt/webui/extensions
+for d in "${DATA_DIR}"/extensions/*; do
+  [[ -d "$d" ]] || continue
+  ln -sf "$d" "/opt/webui/extensions/$(basename "$d")"
+done
+
+# ----- Recommended assets (first-run download if missing)
+# ESRGAN upscalers (work with Ultimate SD Upscale)
+dl "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth" \
+   "${DATA_DIR}/models/ESRGAN/4x-UltraSharp.pth"   # 5
+dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth" \
+   "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus.pth"   # 6
+dl "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth" \
+   "${DATA_DIR}/models/ESRGAN/RealESRGAN_x4plus_anime_6B.pth"   # 7
+
+# ADetailer YOLO models (placed where ADetailer expects)
+dl "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov9c.pt" \
+   "${DATA_DIR}/models/ADetailer/face_yolov9c.pt"   # 8
+dl "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt" \
+   "${DATA_DIR}/models/ADetailer/hand_yolov8n.pt"   # 9
+dl "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8n-seg.pt" \
+   "${DATA_DIR}/models/ADetailer/person_yolov8n-seg.pt"   # 10
+
+# ControlNet note (models are large; see official index)
+echo "[info] ControlNet model index: https://github.com/Mikubill/sd-webui-controlnet/wiki/Model-download" \
+  >> "${DATA_DIR}/first_run_notes.txt"   # 11
 
 # ----- Health shim on :3000 (503 until A1111 ready)
 python3 - <<'PY' &
