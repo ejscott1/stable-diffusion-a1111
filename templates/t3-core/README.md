@@ -1,13 +1,20 @@
-# Template 3 — A1111 + File Browser + JupyterLab + Core Extensions
+# Template 3 — A1111 + File Browser + JupyterLab + Core Extensions (+recommended assets)
 
-Template 2 plus **core extensions** (enabled by default):
-- **ADetailer**
-- **ControlNet**
-- **Ultimate SD Upscale**
-- **Images Browser**
+Template 2 plus **core extensions** and first-run download of recommended files:
 
-Extensions are installed at runtime into `${DATA_DIR}/extensions` (persistent volume),
-and symlinked into `/opt/webui/extensions` so A1111 can see them.
+- **Extensions**: ADetailer, ControlNet, Ultimate SD Upscale, Images Browser  
+- **Upscalers** (to `models/ESRGAN`):  
+  - 4x-UltraSharp.pth (Hugging Face)  
+  - RealESRGAN_x4plus.pth (official release)  
+  - RealESRGAN_x4plus_anime_6B.pth (official release)  
+- **ADetailer YOLO** (to `models/ADetailer`):  
+  - face_yolov9c.pt  
+  - hand_yolov8n.pt  
+  - person_yolov8n-seg.pt
+
+> Sources: UltraSharp (HF), Real-ESRGAN releases, ADetailer model repo.  
+> ControlNet model index (links for SD1.5/XL) is documented here.  
+Links: UltraSharp 12 · Real-ESRGAN 13 · ADetailer models 14 · ControlNet models 15
 
 ---
 
@@ -55,25 +62,21 @@ JUPYTER_PORT=8888
 JUPYTER_DIR=/workspace  
 JUPYTER_TOKEN=  
 
-Core extensions (all default to true):
-ENABLE_EXTENSIONS_CORE=true  
-ENABLE_EXT_ADETAILER=true  
-ENABLE_EXT_CONTROLNET=true  
-ENABLE_EXT_ULTUPSCALE=true  
-ENABLE_EXT_IMAGES_BROWSER=true  
-
 ### Volumes
 - Leave blank → ephemeral (wiped on *Terminate*).  
 - Attach a **named volume** at `/workspace` → persistence.  
 
 At runtime, A1111 uses folders under `${DATA_DIR}` inside the container:
 - `${DATA_DIR}/models/Stable-diffusion`
+- `${DATA_DIR}/models/ControlNet`
+- `${DATA_DIR}/models/ESRGAN`
+- `${DATA_DIR}/models/ADetailer`
 - `${DATA_DIR}/extensions`
 - `${DATA_DIR}/outputs`
 
 ---
 
 ## Notes
-- Default SD 1.5 model (`v1-5-pruned-emaonly`) auto-downloads if none present.  
-- Place your own checkpoints in `${DATA_DIR}/models/Stable-diffusion` for faster startup.  
-- Disable any extension by setting its `ENABLE_EXT_*` to `false`.
+- Default SD 1.5 checkpoint will auto-download if none present.  
+- ControlNet models are **not included** due to size; see the official model index for SD1.5 & SDXL links. 16
+- Upscalers & ADetailer YOLO are downloaded once on first start and reused thereafter.
