@@ -26,7 +26,7 @@ docker.io/freeradical16/stable-diffusion-a1111:t1-bare
 
 ### Environment Variables
 DATA_DIR=/workspace/a1111-data  
-WEBUI_ARGS=--listen --port 7860 --api  
+WEBUI_ARGS=--listen --api  
 
 ### Volumes
 - Leave blank → ephemeral (data wiped on *Terminate*).  
