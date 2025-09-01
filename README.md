@@ -63,7 +63,12 @@ JUPYTER_TOKEN=
 
 ### Volumes
 - Leave blank → ephemeral (data wiped on *Terminate*).  
-- Attach a **named volume** at `/workspace` → persistence for models, extensions, outputs.
+- Attach a **named volume** at `/workspace` → persistence.  
+
+At runtime, A1111 will create and use these folders under `${DATA_DIR}` inside the container:
+- `${DATA_DIR}/models/Stable-diffusion`
+- `${DATA_DIR}/extensions`
+- `${DATA_DIR}/outputs`
 
 ---
 
@@ -80,8 +85,8 @@ You can also trigger builds manually with **workflow_dispatch**.
 
 ## Notes
 - Default SD 1.5 model (`v1-5-pruned-emaonly`) will auto-download on first launch if no model is present.  
-- For best performance, place your own models in `/workspace/a1111-data/models/Stable-diffusion`.  
+- For best performance, place your own models in `${DATA_DIR}/models/Stable-diffusion`.  
 - Logs are written to:
   - `/opt/webui/webui.log`
-  - `/workspace/filebrowser.log`
-  - `/workspace/jupyter.log`
+  - `${DATA_DIR}/filebrowser.log`
+  - `${DATA_DIR}/jupyter.log`
