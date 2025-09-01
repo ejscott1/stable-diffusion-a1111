@@ -17,12 +17,3 @@
 node_modules
 dist
 build
-
-# Workspace contents (but keep the folder itself)
-workspace/*
-!workspace/.gitkeep
-
-# Models, outputs, cache folders (can be very large)
-models/
-outputs/
-cache/
