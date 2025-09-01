@@ -1,37 +1,28 @@
-# -----------------------------------------------------------------------------
-# .dockerignore for stable-diffusion-a1111
-# - Keeps Docker build context lean & fast
-# - Prevents large files (models, outputs, git history) from being baked into image
-# -----------------------------------------------------------------------------
-
-# Git & metadata
+# Ignore Git and GitHub metadata
 .git
-.gitignore
-README*.md
-LICENSE
+.github
 
 # Python caches
 **/__pycache__/
 *.py[cod]
 
-# Logs & temp files
+# Jupyter notebook checkpoints
+**/.ipynb_checkpoints/
+
+# Logs and temporary files
 *.log
-*.swp
-*.swo
 *.tmp
-.DS_Store
 
-# Build / dist folders
-node_modules/
-dist/
-build/
+# Node / frontend junk
+node_modules
+dist
+build
 
-# Heavy data dirs (should live in mounted volume, not in image)
-workspace/
+# Workspace contents (but keep the folder itself)
+workspace/*
+!workspace/.gitkeep
+
+# Models, outputs, cache folders (can be very large)
 models/
 outputs/
-checkpoints/
-lora/
-embeddings/
-vae/
-extensions/
+cache/
