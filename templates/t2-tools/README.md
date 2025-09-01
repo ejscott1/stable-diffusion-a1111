@@ -10,7 +10,7 @@ Designed for easier file management and interactive workflows.
 - File Browser on **port 8080**
 - JupyterLab on **port 8888**
 - Health shim on **port 3000**
-- Log files: `/workspace/filebrowser.log`, `/workspace/jupyter.log`
+- Logs in `/workspace/a1111-data/*.log`
 
 ---
 
@@ -31,7 +31,7 @@ docker.io/freeradical16/stable-diffusion-a1111:t2-tools
 
 Required:
 DATA_DIR=/workspace/a1111-data  
-WEBUI_ARGS=--listen --port 7860 --api  
+WEBUI_ARGS=--listen --api  
 
 Adds for File Browser:
 ENABLE_FILEBROWSER=true  
