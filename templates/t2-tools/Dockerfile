@@ -1,9 +1,5 @@
 # -----------------------------------------------------------------------------
 # Template 2: A1111 + File Browser + JupyterLab
-# - A1111 on 7860 (+ health shim 3000)
-# - File Browser on 8080 (no auth by default; can enable with env)
-# - JupyterLab on 8888 (no token by default; can set via env)
-# - Works with or without a mounted /workspace volume
 # -----------------------------------------------------------------------------
 
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
@@ -14,14 +10,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     TINI_SUBREAPER=1
 
-# Versions (pin what we can)
-ARG FILEBROWSER_VERSION=2.28.0
-
-# System deps
+# System deps (+ iproute2 so `ss` exists; curl for installers)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates tini \
     python3 python3-venv python3-pip \
     libgl1 libglib2.0-0 \
+    iproute2 \
  && rm -rf /var/lib/apt/lists/*
 
 # -------------------------
@@ -46,11 +40,9 @@ RUN pip install --upgrade pip wheel setuptools && \
     pip cache purge
 
 # -------------------------
-# File Browser (single binary)
+# File Browser (official installer selects correct binary)
 # -------------------------
-RUN curl -L -o /usr/local/bin/filebrowser \
-      "https://github.com/filebrowser/filebrowser/releases/download/v${FILEBROWSER_VERSION}/linux-amd64-filebrowser" \
- && chmod +x /usr/local/bin/filebrowser
+RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash
 
 # Startup
 COPY start.sh /usr/local/bin/start.sh
