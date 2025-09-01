@@ -1,6 +1,4 @@
-# Template 3: A1111 + File Browser + Jupyter + Core Extensions
-# Core extensions are installed at runtime into ${DATA_DIR}/extensions (persisted),
-# and symlinked into /opt/webui/extensions so UI sees them.
+# Template 3: A1111 + File Browser + Jupyter + Core Extensions (+recommended assets)
 
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
@@ -22,7 +20,7 @@ WORKDIR /opt/webui
 ARG A1111_REPO=https://github.com/AUTOMATIC1111/stable-diffusion-webui
 RUN git clone --depth=1 ${A1111_REPO} .
 
-# Python venv for A1111 (no Jupyter here)
+# Python venv for A1111 (no Jupyter in this venv)
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 RUN pip install --upgrade pip wheel setuptools && \
@@ -42,7 +40,7 @@ RUN chmod +x /usr/local/bin/start.sh
 
 EXPOSE 7860 3000 8080 8888
 
-# Defaults (Template 2 base)
+# Defaults (Template 2 base; no toggles here)
 ENV DATA_DIR="/workspace/a1111-data" \
     WEBUI_ARGS="--listen --api" \
     PYTHONWARNINGS="" \
@@ -53,13 +51,6 @@ ENV DATA_DIR="/workspace/a1111-data" \
     JUPYTER_PORT="8888" \
     JUPYTER_TOKEN="" \
     JUPYTER_DIR="/workspace"
-
-# Core extensions toggles (all true by default)
-ENV ENABLE_EXTENSIONS_CORE="true" \
-    ENABLE_EXT_ADETAILER="true" \
-    ENABLE_EXT_CONTROLNET="true" \
-    ENABLE_EXT_ULTUPSCALE="true" \
-    ENABLE_EXT_IMAGES_BROWSER="true"
 
 WORKDIR /workspace
 ENTRYPOINT ["/usr/bin/tini","-s","--"]
