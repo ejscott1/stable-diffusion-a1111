@@ -1,124 +1,158 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # Template 2 launcher: A1111 + File Browser + JupyterLab
 # -----------------------------------------------------------------------------
 
-# Fallback to /tmp if /workspace not writable
-if ! mkdir -p /workspace 2>/dev/null; then
-  echo "[init] /workspace not writable, using /tmp"
-  export DATA_DIR="/tmp/a1111-data"
-fi
-
-# Ensure core layout exists
-mkdir -p "${DATA_DIR}"/{models/Stable-diffusion,models/ControlNet,extensions,outputs}
-
-# Optional caches
-for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
-  val="${!v}"
-  if [[ -n "$val" ]]; then
-    mkdir -p "$val"
-    echo "[init] ${v} -> $val"
-  fi
-done
-
-# Helper: port check (ss or netstat)
-port_in_use() {
+# -------- helper: check if a TCP port is listening
+port_listening() {
   local p="$1"
   if command -v ss >/dev/null 2>&1; then
-    ss -lnt | grep -q ":${p} "
+    ss -lntp | grep -q ":${p} "
   else
-    netstat -tuln 2>/dev/null | grep -q ":${p} "
+    netstat -tulpen 2>/dev/null | grep -q ":${p} "
   fi
 }
 
-# -------------------------
-# Start File Browser (optional)
-# -------------------------
-if [[ "${ENABLE_FILEBROWSER,,}" == "true" ]]; then
-  FB_PORT="${FILEBROWSER_PORT:-8080}"
-  FB_ARGS=(--port "${FB_PORT}" --root / --address 0.0.0.0)
-  [[ "${FILEBROWSER_NOAUTH,,}" == "true" ]] && FB_ARGS+=("--noauth")
+# -------- workspace / data dir
+DATA_DIR="${DATA_DIR:-/workspace/a1111-data}"
+if ! mkdir -p /workspace 2>/dev/null; then
+  echo "[init] /workspace not writable; switching to /tmp"
+  DATA_DIR="/tmp/a1111-data"
+  mkdir -p /tmp
+fi
 
-  echo "[start] File Browser ${FB_ARGS[*]}"
-  /usr/local/bin/filebrowser "${FB_ARGS[@]}" >/workspace/filebrowser.log 2>&1 &
-  FB_PID=$!
-  sleep 2
-  if ! kill -0 "$FB_PID" 2>/dev/null; then
-    echo "[error] File Browser exited. Last log lines:"
-    tail -n 50 /workspace/filebrowser.log || true
-  else
-    echo "[ok] File Browser pid=$FB_PID"
+# Core layout for A1111
+mkdir -p "${DATA_DIR}"/{models/Stable-diffusion,models/ControlNet,extensions,outputs}
+
+# Optional caches (quiet warnings + speed if /workspace is persisted)
+for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
+  val="${!v-}"
+  if [[ -n "${val}" ]]; then
+    mkdir -p "${val}"
+    echo "[init] ${v}=${val}"
+  fi
+done
+
+# -----------------------------------------------------------------------------
+# Start File Browser (optional)  — default port 8080
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_FILEBROWSER:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
+  FB_PORT="${FILEBROWSER_PORT:-8080}"
+  echo "[start] File Browser on :${FB_PORT}"
+  # --noauth if requested
+  FB_NOAUTH_FLAG=""
+  [[ "${FILEBROWSER_NOAUTH:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]] && FB_NOAUTH_FLAG="--noauth"
+
+  /usr/local/bin/filebrowser \
+      --port "${FB_PORT}" \
+      --root / \
+      --address 0.0.0.0 \
+      ${FB_NOAUTH_FLAG} \
+      >/workspace/filebrowser.log 2>&1 &
+
+  # wait up to 15s for listen
+  for i in {1..15}; do
+    if port_listening "${FB_PORT}"; then
+      echo "[ok] File Browser listening on :${FB_PORT}"
+      break
+    fi
+    sleep 1
+  done
+  if ! port_listening "${FB_PORT}"; then
+    echo "[error] File Browser failed to start. Last log lines:"
+    tail -n 100 /workspace/filebrowser.log || true
   fi
 fi
 
-# -------------------------
-# Start JupyterLab (optional)
-# -------------------------
-if [[ "${ENABLE_JUPYTER,,}" == "true" ]]; then
+# -----------------------------------------------------------------------------
+# Start JupyterLab (optional) — default port 8888
+# -----------------------------------------------------------------------------
+if [[ "${ENABLE_JUPYTER:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   JDIR="${JUPYTER_DIR:-/workspace}"
   JPORT="${JUPYTER_PORT:-8888}"
   JTOK="${JUPYTER_TOKEN:-}"
-  JOPTS=(--ServerApp.ip=0.0.0.0 --ServerApp.port="${JPORT}" --ServerApp.root_dir="${JDIR}" --ServerApp.allow_origin="*")
-  [[ -z "$JTOK" ]] && JOPTS+=(--ServerApp.token='') || JOPTS+=(--ServerApp.token="${JTOK}")
+  JRUN="${JDIR}/.jupyter_runtime"
+  mkdir -p "${JRUN}"
 
   echo "[start] JupyterLab on :${JPORT} root=${JDIR} token=${JTOK:+***set***}"
-  jupyter lab "${JOPTS[@]}" >/workspace/jupyter.log 2>&1 &
-  JUP_PID=$!
-  sleep 3
-  if ! kill -0 "$JUP_PID" 2>/dev/null; then
-    echo "[error] Jupyter exited. Last log lines:"
-    tail -n 50 /workspace/jupyter.log || true
-  else
-    echo "[ok] Jupyter pid=$JUP_PID"
+
+  jupyter lab \
+    --ServerApp.ip=0.0.0.0 \
+    --ServerApp.port="${JPORT}" \
+    --ServerApp.port_retries=0 \
+    --ServerApp.token="${JTOK}" \
+    --ServerApp.root_dir="${JDIR}" \
+    --ServerApp.runtime_dir="${JRUN}" \
+    --ServerApp.allow_origin="*" \
+    --ServerApp.allow_remote_access=True \
+    --no-browser \
+    --allow-root \
+    >/workspace/jupyter.log 2>&1 &
+
+  # wait up to 30s for listen
+  for i in {1..30}; do
+    if port_listening "${JPORT}"; then
+      echo "[ok] JupyterLab listening on :${JPORT}"
+      break
+    fi
+    sleep 1
+  done
+  if ! port_listening "${JPORT}"; then
+    echo "[error] JupyterLab failed to start. Last log lines:"
+    tail -n 120 /workspace/jupyter.log || true
   fi
 fi
 
-# -------------------------
-# Health shim on :3000 (503 until A1111 answers :7860, then 200)
-# -------------------------
+# -----------------------------------------------------------------------------
+# Health shim (HTTP 503 until A1111 responds on 7860/7861, then 200) on :3000
+# -----------------------------------------------------------------------------
 python3 - <<'PY' >/workspace/health.log 2>&1 &
 import http.server, socketserver, threading, time, urllib.request
-ready = False
+ready=False
 def poll():
     global ready
     while True:
         try:
-            urllib.request.urlopen("http://127.0.0.1:7860/", timeout=1)
-            ready = True
-            time.sleep(2)
+            for port in (7860,7861):
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1)
+                    ready=True; break
+                except Exception:
+                    pass
+            time.sleep(2 if ready else 1)
         except Exception:
-            ready = False
-            time.sleep(1)
+            ready=False; time.sleep(1)
 class H(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-        code = 200 if ready else 503
-        self.send_response(code); self.end_headers()
+        self.send_response(200 if ready else 503); self.end_headers()
         self.wfile.write(b"ok" if ready else b"starting")
+socketserver.TCPServer.allow_reuse_address=True
 threading.Thread(target=poll, daemon=True).start()
-socketserver.TCPServer.allow_reuse_address = True
-with socketserver.TCPServer(("0.0.0.0", 3000), H) as httpd:
+with socketserver.TCPServer(("0.0.0.0",3000), H) as httpd:
     httpd.serve_forever()
 PY
 
-# -------------------------
-# Pick A1111 port (fallback 7861 if busy)
-# -------------------------
-PORT_DEFAULT=7860
-PORT=${PORT:-$PORT_DEFAULT}
-if port_in_use "${PORT_DEFAULT}"; then
-  echo "[init] Port ${PORT_DEFAULT} busy, switching to 7861"
+# -----------------------------------------------------------------------------
+# Pick A1111 port (fallback to 7861 if 7860 is busy)
+# -----------------------------------------------------------------------------
+PORT="${PORT:-7860}"
+if port_listening "7860"; then
+  echo "[init] Port 7860 is already in use; using 7861"
   PORT=7861
 fi
 
-# -------------------------
-# Launch A1111 (tee to log)
-# -------------------------
+# -----------------------------------------------------------------------------
+# Launch A1111 (tee logs)
+# -----------------------------------------------------------------------------
 cd /opt/webui
+
+# Allow extra args from WEBUI_ARGS, but enforce our data dir & chosen port
+echo "[start] A1111 on :${PORT} (data dir: ${DATA_DIR})"
 exec python3 launch.py \
   --data-dir "${DATA_DIR}" \
   --enable-insecure-extension-access \
   ${WEBUI_ARGS:-} \
-  --port ${PORT} \
+  --port "${PORT}" \
   2>&1 | tee -a /opt/webui/webui.log
