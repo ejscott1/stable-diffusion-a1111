@@ -15,7 +15,7 @@ port_listening() {
 }
 
 DATA_DIR="${DATA_DIR:-/workspace/a1111-data}"
-WEBUI_ARGS="${WEBUI_ARGS:---listen --port 7860 --api}"
+WEBUI_ARGS="${WEBUI_ARGS:---listen --api}"
 mkdir -p "${DATA_DIR}"/{models/Stable-diffusion,models/ControlNet,extensions,outputs}
 
 # Optional caches
@@ -31,7 +31,7 @@ if [[ "${ENABLE_FILEBROWSER:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   echo "[start] File Browser on :${FB_PORT}"
   nohup filebrowser --address 0.0.0.0 --port "$FB_PORT" --root / \
       $( [[ "${FILEBROWSER_NOAUTH:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]] && echo --noauth ) \
-      >/workspace/filebrowser.log 2>&1 &
+      >"${DATA_DIR}/filebrowser.log" 2>&1 &
   for i in {1..30}; do port_listening "$FB_PORT" && echo "[ok] filebrowser :$FB_PORT" && break; sleep 1; done
 fi
 
@@ -63,15 +63,16 @@ if [[ "${ENABLE_JUPYTER:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
     --ServerApp.allow_remote_access=True \
     --no-browser \
     --allow-root \
-    >/workspace/jupyter.log 2>&1 &
+    >"${DATA_DIR}/jupyter.log" 2>&1 &
   for i in {1..30}; do port_listening "$J_PORT" && echo "[ok] jupyter :${J_PORT}" && break; sleep 1; done
 fi
 
 # -------- Health shim on :3000 (503 until A1111 ready)
 python3 - <<'PY' &
-import http.server, socketserver, urllib.request
+import http.server, socketserver, urllib.request, os
+APP_PORT = int(os.environ.get("PORT","7860"))
 def ready():
-    try: urllib.request.urlopen("http://127.0.0.1:7860", timeout=0.3); return True
+    try: urllib.request.urlopen(f"http://127.0.0.1:{APP_PORT}", timeout=0.3); return True
     except: return False
 class H(http.server.SimpleHTTPRequestHandler):
     def do_GET(self): self.send_response(200 if ready() else 503); self.end_headers()
@@ -79,12 +80,14 @@ with socketserver.TCPServer(("0.0.0.0",3000), H) as httpd: httpd.serve_forever()
 PY
 
 # -------- A1111 (via launch.py)
-echo "[start] A1111 :7860  data=${DATA_DIR}"
+PORT=${PORT:-7860}
+echo "[start] A1111 :${PORT}  data=${DATA_DIR}"
 nohup python3 /opt/webui/launch.py \
   --data-dir "${DATA_DIR}" \
   --enable-insecure-extension-access \
   ${WEBUI_ARGS} \
-  >/opt/webui/webui.log 2>&1 &
+  --port "${PORT}" \
+  >"${DATA_DIR}/webui.log" 2>&1 &
 
-echo "[tail] /opt/webui/webui.log"
-tail -n +1 -f /opt/webui/webui.log
+echo "[tail] ${DATA_DIR}/webui.log"
+tail -n +1 -f "${DATA_DIR}/webui.log"
