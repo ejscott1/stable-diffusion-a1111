@@ -5,6 +5,9 @@ echo "---------------------------------------------------------------"
 echo "# Template 3: A1111 + File Browser + Jupyter + Core Extensions"
 echo "---------------------------------------------------------------"
 
+# Safer globbing: empty matches expand to nothing (prevents literal '*/' paths)
+shopt -s nullglob
+
 port_listening() {
   local p="${1:?port}"
   if command -v ss >/dev/null 2>&1; then
@@ -19,7 +22,10 @@ norm_true() {
 }
 
 dl() {  # dl <url> <dst>
-  local url="$1" dst="$2"
+  local url="${1:-}" dst="${2:-}"
+  if [[ -z "${url}" || -z "${dst}" ]]; then
+    echo "[dl] missing url or dst"; return 1
+  fi
   [[ -f "$dst" ]] && { echo "[dl] exists: $(basename "$dst")"; return 0; }
   echo "[dl] $url -> $dst"
   mkdir -p "$(dirname "$dst")"
@@ -33,9 +39,10 @@ WEBUI_ARGS="${WEBUI_ARGS:---listen --api}"
 mkdir -p "${DATA_DIR}"/models/{Stable-diffusion,ControlNet,ESRGAN,ADetailer} \
          "${DATA_DIR}"/{extensions,outputs}
 
-# Optional caches
+# Optional caches (avoid ${!v} with set -u; use printenv safely)
 for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
-  val="${!v:-}"; [[ -n "$val" ]] && mkdir -p "$val" || true
+  val="$(printenv "$v" || true)"
+  if [[ -n "${val:-}" ]]; then mkdir -p "$val"; fi
 done
 
 export PATH="/opt/venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
@@ -44,9 +51,10 @@ export PATH="/opt/venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 if norm_true "${ENABLE_FILEBROWSER:-true}"; then
   FB_PORT="${FILEBROWSER_PORT:-8080}"
   echo "[start] File Browser :${FB_PORT}"
+  FB_NOAUTH_FLAG=""
+  if norm_true "${FILEBROWSER_NOAUTH:-true}"; then FB_NOAUTH_FLAG="--noauth"; fi
   nohup filebrowser --address 0.0.0.0 --port "$FB_PORT" --root / \
-     $( norm_true "${FILEBROWSER_NOAUTH:-true}" && echo --noauth ) \
-     >"${DATA_DIR}/filebrowser.log" 2>&1 &
+     ${FB_NOAUTH_FLAG} >"${DATA_DIR}/filebrowser.log" 2>&1 &
   for i in {1..30}; do port_listening "$FB_PORT" && echo "[ok] filebrowser :$FB_PORT" && break; sleep 1; done
 fi
 
@@ -84,7 +92,11 @@ fi
 
 # ----- Core extensions (persist under ${DATA_DIR}/extensions, symlink to /opt/webui)
 install_ext() {
-  local name="$1" repo="$2" dest="${DATA_DIR}/extensions/${name}"
+  local name="${1:-}" repo="${2:-}"
+  if [[ -z "$name" || -z "$repo" ]]; then
+    echo "[ext] missing name or repo"; return 1
+  fi
+  local dest="${DATA_DIR}/extensions/${name}"
   if [[ ! -d "$dest/.git" ]]; then
     echo "[ext] installing $name -> $dest"
     git clone --depth=1 "$repo" "$dest" || { echo "[ext] failed: $name"; return 1; }
@@ -93,7 +105,6 @@ install_ext() {
   fi
 }
 
-# ADetailer, ControlNet, Ultimate Upscale, Images Browser
 install_ext "adetailer" "https://github.com/Bing-su/adetailer"
 install_ext "sd-webui-controlnet" "https://github.com/Mikubill/sd-webui-controlnet"
 install_ext "ultimate-upscale-for-automatic1111" "https://github.com/Coyote-A/ultimate-upscale-for-automatic1111"
@@ -126,15 +137,12 @@ dl "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8n-seg.pt" 
 # ControlNet — include SD 1.5 basics by default (canny, depth, openpose)
 CN_DIR="${DATA_DIR}/models/ControlNet"
 mkdir -p "${CN_DIR}"
-
 dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11p_sd15_canny.pth" \
    "${CN_DIR}/control_v11p_sd15_canny.pth"
 dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11f1p_sd15_depth.pth" \
    "${CN_DIR}/control_v11f1p_sd15_depth.pth"
 dl "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/models/control_v11p_sd15_openpose.pth" \
    "${CN_DIR}/control_v11p_sd15_openpose.pth"
-
-# (Optional to expand later: add SDXL variants above with extra dl lines)
 
 # ----- Health shim on :3000 (503 until A1111 ready)
 python3 - <<'PY' &
@@ -149,7 +157,7 @@ with socketserver.TCPServer(("0.0.0.0",3000), H) as httpd: httpd.serve_forever()
 PY
 
 # ----- A1111 (via launch.py) with port fallback
-PORT=${PORT:-7860}
+PORT="${PORT:-7860}"
 if port_listening "$PORT"; then
   echo "[init] port ${PORT} busy, trying 7861"
   PORT=7861
