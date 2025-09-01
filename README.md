@@ -13,8 +13,9 @@ Templates are built via GitHub Actions and pushed to Docker Hub.
 - Works with or without a persistent volume
 - Use when you just need the WebUI
 
-Docker Hub image:
+```
 docker.io/freeradical16/stable-diffusion-a1111:t1-bare
+```
 
 ---
 
@@ -24,34 +25,41 @@ docker.io/freeradical16/stable-diffusion-a1111:t1-bare
 - JupyterLab on port 8888  
 - Health shim on 3000 (used by RunPod for readiness)
 
-Docker Hub image:
+```
 docker.io/freeradical16/stable-diffusion-a1111:t2-tools
+```
 
 ---
 
 ## RunPod Setup
 
 ### Ports to expose
-7860  
-3000  
-8080  
-8888  
+```
+7860
+3000
+8080
+8888
+```
 
 ### Environment variables
 
 Both templates require:
-DATA_DIR=/workspace/a1111-data  
-WEBUI_ARGS=--listen --port 7860 --api  
+```
+DATA_DIR=/workspace/a1111-data
+WEBUI_ARGS=--listen --api
+```
 
 Template 2 adds:
-ENABLE_FILEBROWSER=true  
-FILEBROWSER_PORT=8080  
-FILEBROWSER_NOAUTH=true  
+```
+ENABLE_FILEBROWSER=true
+FILEBROWSER_PORT=8080
+FILEBROWSER_NOAUTH=true
 
-ENABLE_JUPYTER=true  
-JUPYTER_PORT=8888  
-JUPYTER_DIR=/workspace  
-JUPYTER_TOKEN=  
+ENABLE_JUPYTER=true
+JUPYTER_PORT=8888
+JUPYTER_DIR=/workspace
+JUPYTER_TOKEN=
+```
 
 ### Volumes
 - Leave blank → ephemeral (data wiped on *Terminate*).  
