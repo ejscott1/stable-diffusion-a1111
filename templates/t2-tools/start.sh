@@ -2,10 +2,9 @@
 set -euo pipefail
 
 echo "------------------------------------------------------------------"
-echo "# Template 2 launcher: A1111  + (optional) File Browser + Jupyter"
+echo "# Template 2: A1111 + File Browser + (isolated) Jupyter on volume"
 echo "------------------------------------------------------------------"
 
-# -------- helper: check if a TCP port is listening
 port_listening() {
   local p="${1:?port}"
   if command -v ss >/dev/null 2>&1; then
@@ -15,107 +14,77 @@ port_listening() {
   fi
 }
 
-# -------- env / defaults
 DATA_DIR="${DATA_DIR:-/workspace/a1111-data}"
 WEBUI_ARGS="${WEBUI_ARGS:---listen --port 7860 --api}"
-
-# Optional caches (quiet warnings + speed if /workspace is persisted)
-for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
-  val="${!v:-}"
-  if [[ -n "${val}" ]]; then
-    mkdir -p "$val" || true
-  fi
-done
-
-# Core layout for A1111
 mkdir -p "${DATA_DIR}"/{models/Stable-diffusion,models/ControlNet,extensions,outputs}
 
-# Put the venv on PATH if present
+# Optional caches
+for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
+  val="${!v:-}"; [[ -n "$val" ]] && mkdir -p "$val" || true
+done
+
 export PATH="/opt/venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 
-# -------- Start File Browser (optional)  : default port 8080
-if [[ "${ENABLE_FILEBROWSER:-false}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
-  FB_BIN="$(command -v filebrowser || true)"
+# -------- File Browser (8080)
+if [[ "${ENABLE_FILEBROWSER:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   FB_PORT="${FILEBROWSER_PORT:-8080}"
-  FB_NOAUTH="${FILEBROWSER_NOAUTH:-true}"
-
-  if [[ -x "$FB_BIN" ]]; then
-    echo "[start] File Browser on :${FB_PORT}"
-    nohup "$FB_BIN" \
-      --address 0.0.0.0 \
-      --port "$FB_PORT" \
-      --root / \
-      $( [[ "$FB_NOAUTH" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]] && echo --noauth ) \
+  echo "[start] File Browser on :${FB_PORT}"
+  nohup filebrowser --address 0.0.0.0 --port "$FB_PORT" --root / \
+      $( [[ "${FILEBROWSER_NOAUTH:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]] && echo --noauth ) \
       >/workspace/filebrowser.log 2>&1 &
-    for i in {1..30}; do
-      port_listening "$FB_PORT" && echo "[ok] File Browser listening on :${FB_PORT}" && break
-      sleep 1
-      [[ $i -eq 30 ]] && echo "[warn] File Browser not listening after 30s" && break
-    done
-  else
-    echo "[warn] filebrowser binary not found on PATH; skipping."
-  fi
-else
-  echo "[skip] File Browser disabled (ENABLE_FILEBROWSER=${ENABLE_FILEBROWSER:-unset})"
+  for i in {1..30}; do port_listening "$FB_PORT" && echo "[ok] filebrowser :$FB_PORT" && break; sleep 1; done
 fi
 
-# -------- Start JupyterLab (optional)    : default port 8888
-if [[ "${ENABLE_JUPYTER:-false}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
-  J_BIN="$(command -v jupyter || true)"
-  J_PORT="${JUPYTER_PORT:-8888}"
+# -------- JupyterLab (isolated venv on /workspace)
+if [[ "${ENABLE_JUPYTER:-true}" =~ ^([Tt][Rr][Uu][Ee]|1)$ ]]; then
   J_DIR="${JUPYTER_DIR:-/workspace}"
-  J_TOKEN="${JUPYTER_TOKEN:-}"
-  J_RUN="/workspace/.jupyter_runtime"; mkdir -p "$J_RUN" || true
+  J_PORT="${JUPYTER_PORT:-8888}"
+  J_TOK="${JUPYTER_TOKEN:-}"
+  J_RUN="${J_DIR}/.jupyter_runtime"
+  J_VENV="/workspace/jupyter-venv"
 
-  if [[ -x "$J_BIN" ]]; then
-    echo "[start] JupyterLab on :${J_PORT}  root=${J_DIR} token='${J_TOKEN:+***set***}'"
-    nohup "$J_BIN" lab \
-      --ServerApp.ip=0.0.0.0 \
-      --ServerApp.port="$J_PORT" \
-      --ServerApp.port_retries=0 \
-      --ServerApp.root_dir="$J_DIR" \
-      --ServerApp.runtime_dir="$J_RUN" \
-      --ServerApp.token="$J_TOKEN" \
-      --ServerApp.allow_origin="*" \
-      --ServerApp.allow_remote_access=True \
-      --no-browser \
-      --allow-root \
-      >/workspace/jupyter.log 2>&1 &
-    for i in {1..30}; do
-      port_listening "$J_PORT" && echo "[ok] JupyterLab listening on :${J_PORT}" && break
-      sleep 1
-      [[ $i -eq 30 ]] && echo "[warn] JupyterLab not listening after 30s" && break
-    done
-  else
-    echo "[warn] jupyter binary not found on PATH; skipping."
+  if [[ ! -x "${J_VENV}/bin/jupyter" ]]; then
+    echo "[jup] creating venv at ${J_VENV} ..."
+    python3 -m venv "${J_VENV}"
+    "${J_VENV}/bin/pip" install --upgrade pip wheel setuptools
+    "${J_VENV}/bin/pip" install jupyterlab==4.2.5 notebook==7.2.2
   fi
-else
-  echo "[skip] JupyterLab disabled (ENABLE_JUPYTER=${ENABLE_JUPYTER:-unset})"
+
+  mkdir -p "${J_RUN}"
+  echo "[start] JupyterLab on :${J_PORT} root=${J_DIR} token=${J_TOK:+***set***}"
+  nohup "${J_VENV}/bin/jupyter" lab \
+    --ServerApp.ip=0.0.0.0 \
+    --ServerApp.port="${J_PORT}" \
+    --ServerApp.port_retries=0 \
+    --ServerApp.root_dir="${J_DIR}" \
+    --ServerApp.runtime_dir="${J_RUN}" \
+    --ServerApp.token="${J_TOK}" \
+    --ServerApp.allow_origin="*" \
+    --ServerApp.allow_remote_access=True \
+    --no-browser \
+    --allow-root \
+    >/workspace/jupyter.log 2>&1 &
+  for i in {1..30}; do port_listening "$J_PORT" && echo "[ok] jupyter :${J_PORT}" && break; sleep 1; done
 fi
 
-# -------- Health shim on :3000 (HTTP 503 until A1111 is ready → 200)
+# -------- Health shim on :3000 (503 until A1111 ready)
 python3 - <<'PY' &
-import http.server, socketserver, threading, time, urllib.request
-PORT=3000
+import http.server, socketserver, urllib.request
 def ready():
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:7860", timeout=0.3) as r: return True
-    except Exception: return False
+    try: urllib.request.urlopen("http://127.0.0.1:7860", timeout=0.3); return True
+    except: return False
 class H(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        c=200 if ready() else 503
-        self.send_response(c); self.end_headers(); self.wfile.write(f"{c}\n".encode())
-with socketserver.TCPServer(("0.0.0.0", PORT), H) as httpd: httpd.serve_forever()
+    def do_GET(self): self.send_response(200 if ready() else 503); self.end_headers()
+with socketserver.TCPServer(("0.0.0.0",3000), H) as httpd: httpd.serve_forever()
 PY
 
-# -------- Start A1111 (via launch.py instead of webui.sh)
-echo "[start] A1111 on :7860 (data dir: ${DATA_DIR})"
+# -------- A1111 (via launch.py)
+echo "[start] A1111 :7860  data=${DATA_DIR}"
 nohup python3 /opt/webui/launch.py \
   --data-dir "${DATA_DIR}" \
   --enable-insecure-extension-access \
   ${WEBUI_ARGS} \
   >/opt/webui/webui.log 2>&1 &
 
-# Keep container alive and tail the log
 echo "[tail] /opt/webui/webui.log"
 tail -n +1 -f /opt/webui/webui.log
