@@ -1,4 +1,5 @@
-# Minimal A1111 + Jupyter image (no extras). You install models/extensions on the volume.
+# Minimal A1111 + Jupyter image (no extras).
+# You install models/extensions on the persistent volume yourself.
 
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
@@ -22,7 +23,7 @@ RUN git clone --depth=1 https://github.com/AUTOMATIC1111/stable-diffusion-webui.
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Torch/cuDNN (CUDA 12.1) + minimal deps. Keep it slim; you’ll add extras later in the volume.
+# Torch/cuDNN (CUDA 12.1) + minimal deps
 RUN pip install --upgrade pip wheel setuptools && \
     pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu121 \
         torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 && \
@@ -33,10 +34,7 @@ RUN pip install --upgrade pip wheel setuptools && \
 COPY start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-# Nicety for docs / port mapping (RunPod maps anyway)
 EXPOSE 7860 8888
-
-# Volume workdir
 WORKDIR /workspace
 
 CMD ["/usr/local/bin/start.sh"]
