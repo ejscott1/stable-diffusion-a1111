@@ -2,6 +2,7 @@
 
 [![Build & Push (latest)](https://github.com/ejscott1/stable-diffusion-a1111/actions/workflows/build.yml/badge.svg)](https://github.com/ejscott1/stable-diffusion-a1111/actions/workflows/build.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/freeradical16/stable-diffusion-a1111.svg)](https://hub.docker.com/r/freeradical16/stable-diffusion-a1111)
+[![Docker Image Version (latest)](https://img.shields.io/docker/v/freeradical16/stable-diffusion-a1111/latest)](https://hub.docker.com/r/freeradical16/stable-diffusion-a1111)
 
 This template builds a lightweight Docker image with only:
 
