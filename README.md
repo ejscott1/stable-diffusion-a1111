@@ -1,92 +1,49 @@
-# Stable Diffusion A1111 on RunPod
+# Minimal Stable Diffusion WebUI + Jupyter Template
 
-This repo provides Docker templates for running **Automatic1111 Stable Diffusion WebUI** on [RunPod](https://www.runpod.io).  
-Templates are built via GitHub Actions and pushed to Docker Hub.
+This template builds a lightweight Docker image with only:
 
----
+- Automatic1111 WebUI
+- JupyterLab
 
-## Templates
-
-### Template 1 — Bare A1111
-- Runs Automatic1111 only
-- Minimal image, fastest to build
-- Works with or without a persistent volume
-- Use when you just need the WebUI
-
-```
-docker.io/freeradical16/stable-diffusion-a1111:t1-bare
-```
+No models, extensions, or extras are bundled — you install them into the
+persistent volume so they survive pod restarts.
 
 ---
 
-### Template 2 — A1111 + File Browser + JupyterLab
-- A1111 on port 7860  
-- File Browser on port 8080  
-- JupyterLab on port 8888  
-- Health shim on 3000 (used by RunPod for readiness)
+## Image
 
-```
-docker.io/freeradical16/stable-diffusion-a1111:t2-tools
-```
+docker.io/freeradical16/stable-diffusion-a1111:latest
 
 ---
 
 ## RunPod Setup
 
-### Ports to expose
-```
-7860
-3000
-8080
-8888
-```
+### Ports
+- 7860 → WebUI
+- 8888 → Jupyter
 
-### Environment variables
+### Environment Variables
+DATA_DIR=/workspace/a1111-data  
+WEBUI_ARGS=--listen --api  
+ENABLE_JUPYTER=true  
+JUPYTER_PORT=8888  
+JUPYTER_DIR=/workspace  
+JUPYTER_TOKEN=  
 
-Both templates require:
-```
-DATA_DIR=/workspace/a1111-data
-WEBUI_ARGS=--listen --api
-```
+### Volume
+Attach a persistent volume at `/workspace`.
 
-Template 2 adds:
-```
-ENABLE_FILEBROWSER=true
-FILEBROWSER_PORT=8080
-FILEBROWSER_NOAUTH=true
-
-ENABLE_JUPYTER=true
-JUPYTER_PORT=8888
-JUPYTER_DIR=/workspace
-JUPYTER_TOKEN=
-```
-
-### Volumes
-- Leave blank → ephemeral (data wiped on *Terminate*).  
-- Attach a **named volume** at `/workspace` → persistence.  
-
-At runtime, A1111 will create and use these folders under `${DATA_DIR}` inside the container:
-- `${DATA_DIR}/models/Stable-diffusion`
-- `${DATA_DIR}/extensions`
-- `${DATA_DIR}/outputs`
+Inside the container, WebUI uses:
+- ${DATA_DIR}/models/Stable-diffusion  
+- ${DATA_DIR}/models/Lora  
+- ${DATA_DIR}/models/VAE  
+- ${DATA_DIR}/extensions  
+- ${DATA_DIR}/outputs  
 
 ---
 
-## Build & Push
-
-Each template has its own workflow under `.github/workflows`. On push, GitHub Actions:
-1. Builds the Docker image  
-2. Tags it (e.g. `t1-bare`, `t2-tools`)  
-3. Pushes to Docker Hub  
-
-You can also trigger builds manually with **workflow_dispatch**.
-
----
-
-## Notes
-- Default SD 1.5 model (`v1-5-pruned-emaonly`) will auto-download on first launch if no model is present.  
-- For best performance, place your own models in `${DATA_DIR}/models/Stable-diffusion`.  
-- Logs are written to:
-  - `/opt/webui/webui.log`
-  - `${DATA_DIR}/filebrowser.log`
-  - `${DATA_DIR}/jupyter.log`
+## Usage Notes
+- First boot will create ${DATA_DIR} and a Jupyter venv if missing.  
+- You can install models, LoRAs, and extensions (like WAN) by placing them under
+  ${DATA_DIR}. They’ll persist across restarts.  
+- Keep this image minimal and stable; extend functionality via your volume.
