@@ -1,9 +1,11 @@
 # Minimal Stable Diffusion WebUI + Jupyter Template
 
+[![Build & Push (latest)](https://github.com/ejscott1/stable-diffusion-a1111/actions/workflows/build.yml/badge.svg)](https://github.com/ejscott1/stable-diffusion-a1111/actions/workflows/build.yml)
+
 This template builds a lightweight Docker image with only:
 
-- Automatic1111 WebUI
-- JupyterLab
+- Automatic1111 WebUI  
+- JupyterLab  
 
 No models, extensions, or extras are bundled — you install them into the
 persistent volume so they survive pod restarts.
@@ -19,8 +21,8 @@ docker.io/freeradical16/stable-diffusion-a1111:latest
 ## RunPod Setup
 
 ### Ports
-- 7860 → WebUI
-- 8888 → Jupyter
+- 7860 → WebUI  
+- 8888 → Jupyter  
 
 ### Environment Variables
 DATA_DIR=/workspace/a1111-data  
@@ -33,7 +35,7 @@ JUPYTER_TOKEN=
 ### Volume
 Attach a persistent volume at `/workspace`.
 
-Inside the container, WebUI uses:
+Inside the container, WebUI uses:  
 - ${DATA_DIR}/models/Stable-diffusion  
 - ${DATA_DIR}/models/Lora  
 - ${DATA_DIR}/models/VAE  
