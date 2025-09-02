@@ -1,0 +1,33 @@
+# Git + CI
+.git
+.github
+.gitignore
+.gitattributes
+
+# Editor / OS files
+*.swp
+*.swo
+*.DS_Store
+*.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Model + output dirs (you’ll keep these in /workspace volume, not in image)
+models/
+outputs/
+extensions/
+cache/
+checkpoints/
+lora/
+vae/
+
+# Logs
+*.log
+
+# Docker build junk
+Dockerfile.old
+start.sh.old
