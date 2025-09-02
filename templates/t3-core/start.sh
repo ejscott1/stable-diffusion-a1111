@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# robust: stop on error (-e), bubble trap errors (-E), fail pipelines (pipefail)
+set -eE -o pipefail
 
 echo "---------------------------------------------------------------"
 echo "# Template 3: A1111 + File Browser + Jupyter + Core Extensions"
@@ -18,18 +19,19 @@ port_listening() {
 }
 
 norm_true() {
+  # treat empty/missing as false, accept true/1/yes
   [[ "$(echo "${1:-}" | sed 's/#.*$//' | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" =~ ^(true|1|yes)$ ]]
 }
 
 dl() {  # dl <url> <dst>
   local url="${1:-}" dst="${2:-}"
   if [[ -z "$url" || -z "$dst" ]]; then
-    echo "[dl] missing url or dst"; return 1
+    echo "[dl] missing url or dst"; return 0
   fi
   [[ -f "$dst" ]] && { echo "[dl] exists: $(basename "$dst")"; return 0; }
   echo "[dl] $url -> $dst"
   mkdir -p "$(dirname "$dst")"
-  curl -fL --retry 5 --retry-delay 2 "$url" -o "$dst"
+  curl -fL --retry 5 --retry-delay 2 "$url" -o "$dst" || echo "[dl] WARN failed for $(basename "$dst")"
 }
 
 DATA_DIR="${DATA_DIR:-/workspace/a1111-data}"
@@ -39,10 +41,10 @@ WEBUI_ARGS="${WEBUI_ARGS:---listen --api}"
 mkdir -p "${DATA_DIR}"/models/{Stable-diffusion,ControlNet,ESRGAN,ADetailer} \
          "${DATA_DIR}"/{extensions,outputs}
 
-# Optional caches (avoid ${!v} with set -u; use printenv safely)
+# Optional caches (don’t explode if not set)
 for v in PIP_CACHE_DIR HF_HOME TORCH_HOME; do
   val="$(printenv "$v" || true)"
-  if [[ -n "${val:-}" ]]; then mkdir -p "$val"; fi
+  [[ -n "$val" ]] && mkdir -p "$val" || true
 done
 
 export PATH="/opt/venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
@@ -50,11 +52,11 @@ export PATH="/opt/venv/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
 # -------------------- File Browser --------------------
 if norm_true "${ENABLE_FILEBROWSER:-true}"; then
   FB_PORT="${FILEBROWSER_PORT:-8080}"
-  echo "[start] File Browser :${FB_PORT}"
   FB_NOAUTH_FLAG=""
   if norm_true "${FILEBROWSER_NOAUTH:-true}"; then FB_NOAUTH_FLAG="--noauth"; fi
-  nohup filebrowser --address 0.0.0.0 --port "$FB_PORT" --root / \
-     ${FB_NOAUTH_FLAG} >"${DATA_DIR}/filebrowser.log" 2>&1 &
+  echo "[start] File Browser :${FB_PORT}"
+  nohup filebrowser --address 0.0.0.0 --port "$FB_PORT" --root / ${FB_NOAUTH_FLAG} \
+    >"${DATA_DIR}/filebrowser.log" 2>&1 &
   for i in {1..30}; do port_listening "$FB_PORT" && echo "[ok] filebrowser :$FB_PORT" && break; sleep 1; done
 fi
 
@@ -93,12 +95,9 @@ fi
 # --------------- Core A1111 Extensions ----------------
 install_ext() {
   local name="${1:-}" repo="${2:-}" dest="${DATA_DIR}/extensions/${name}"
-  if [[ -z "$name" || -z "$repo" ]]; then
-    echo "[ext] missing name or repo"; return 0
-  fi
+  [[ -z "$name" || -z "$repo" ]] && { echo "[ext] missing name or repo"; return 0; }
   if [[ ! -d "$dest/.git" ]]; then
     echo "[ext] installing $name -> $dest"
-    # Prevent credential prompts; if GitHub hiccups, don't kill the pod
     if GIT_ASKPASS=true git clone --depth=1 "$repo" "$dest"; then
       echo "[ext] ok: $name"
     else
